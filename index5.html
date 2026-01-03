@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ME Damai Group System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #FFF7ED; touch-action: manipulation; }
+        .theme-orange { color: #F97316; }
+        .bg-theme-orange { background-color: #F97316; }
+        .btn-primary { background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); color: white; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.3); }
+        .btn-primary:active { transform: scale(0.98); }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .loader { width: 48px; height: 48px; border: 5px solid #FFF; border-bottom-color: #F97316; border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Animation */
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- CONFIG -->
+    <script>
+        // *** ตรวจสอบ URL นี้ให้ถูกต้อง ***
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwCCOHarpp6n9Q3i3fqF9L8iQHfg8NGsMDIgDOCcPohh6X8vZVeRAKMMtVXAWWoUhNTPQ/exec"; 
+        let user = JSON.parse(localStorage.getItem('medamai_user')) || null;
+        let allSalesData = []; 
+        let allExpenseData = []; 
+        let clockInterval = null; 
+        let editSaleRowIndex = null;
+        let editExpenseRowIndex = null;
+        let editStockRowIndex = null; 
+        let cachedUsers = [];
+    </script>
+
+    <!-- SPINNER -->
+    <div id="loading" class="fixed inset-0 bg-black/50 z-[9999] flex flex-col items-center justify-center hidden backdrop-blur-sm">
+        <span class="loader"></span>
+        <p class="text-white mt-4 font-light">กำลังประมวลผล...</p>
+    </div>
+
+    <!-- 1. LOGIN SCREEN -->
+    <div id="login-view" class="w-full max-w-sm glass rounded-3xl p-8 shadow-2xl hidden">
+        <div class="flex justify-center mb-6">
+            <img src="https://scontent.fbkk5-3.fna.fbcdn.net/v/t39.30808-6/302138666_454217166726068_6547261018489911741_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=5nB47QwHZBgQ7kNvwFcHq1M&_nc_oc=Adk8qOougIC1geykvgs6dtVU4ZMEDWELyM0JoX2f_slAwBixLtz-3gpPTYvbvC_i9H70oEZNPHtH8P2JJ20_eaKZ&_nc_zt=23&_nc_ht=scontent.fbkk5-3.fna&_nc_gid=X6NyKBmcuSuVqVJ42fcF2g&oh=00_Afk7u-EnAA_rv7HQIymxw3O0PxHXjx_VuPqo_sqKyJPp_g&oe=6951CEF7" class="h-28 drop-shadow-md">
+        </div>
+        <h2 class="text-2xl font-bold text-center text-orange-600 mb-6">ME Damai Group</h2>
+        <form onsubmit="doLogin(event)">
+            <div class="space-y-4">
+                <input type="text" id="logUser" placeholder="ชื่อผู้ใช้" class="w-full px-4 py-3 rounded-xl border border-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-orange-50/50" required>
+                <div class="relative">
+                    <input type="password" id="logPass" placeholder="รหัสผ่าน" class="w-full px-4 py-3 rounded-xl border border-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-orange-50/50" required>
+                    <i class="fa-solid fa-eye absolute right-4 top-4 text-orange-300 cursor-pointer" onclick="togglePass('logPass')"></i>
+                </div>
+                <div class="flex items-center text-sm text-gray-500 ml-1">
+                    <input type="checkbox" id="remember" class="mr-2 accent-orange-500"> จำรหัสผ่าน
+                </div>
+                <button type="submit" id="btnLogin" class="w-full btn-primary py-3 rounded-xl font-bold text-lg shadow-orange-300">เข้าสู่ระบบ</button>
+            </div>
+        </form>
+        <div class="mt-8 text-center border-t border-orange-100 pt-4">
+             <button onclick="triggerSetup()" id="btnSetup" class="text-xs text-orange-400 hover:underline"><i class="fa-solid fa-gear"></i> ตั้งค่าระบบครั้งแรก</button>
+        </div>
+    </div>
+
+    <!-- 2. MAIN APP SCREEN -->
+    <div id="app-view" class="w-full max-w-lg hidden pb-10">
+        <!-- Header -->
+        <div class="bg-white rounded-b-3xl shadow-lg p-5 mb-6 relative z-10">
+            <div class="flex items-center gap-4">
+                <img src="https://scontent.fbkk5-6.fna.fbcdn.net/v/t39.30808-6/481996972_9361719997210476_8755471803837534385_n.jpg?_nc_cat=101&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeEVClACIGg_3qPepzxsPcolDon1tMFg5GUOifW0wWDkZeq3ctvlO6CvzZnr19tOwpOZHrqaTV03Putk3yLT9j3h&_nc_ohc=dMWEd7qKHUoQ7kNvwFXFez4&_nc_oc=AdlED3G9pMH_sgt2Uq1RHyuaebVF7ur2lVdV3jO8sgs9r1_6gpmKCukf4jTW8TT8GI4&_nc_zt=23&_nc_ht=scontent.fbkk5-6.fna&_nc_gid=XRsjEE9h6AOgXjPImKCMQg&oh=00_AfnHOfpHII_6UyKxSNbBr9of9-TkKBUPQ2EmJ3ztgTfUiQ&oe=695837D7" class="w-16 h-16 rounded-full border-2 border-orange-500 object-cover shadow-md">
+                <div class="flex-1">
+                    <h1 class="font-bold text-lg text-gray-800">ยินดีต้อนรับ</h1>
+                    <p class="text-orange-600 font-semibold" id="navUser">User Name</p>
+                </div>
+                <div class="flex gap-2">
+                     <button onclick="changePass()" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-orange-100 hover:text-orange-500"><i class="fa-solid fa-key"></i></button>
+                     <button onclick="doLogout()" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-500"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic Content -->
+        <div id="menu-grid" class="grid grid-cols-2 gap-4 px-2"></div>
+        <div id="content-area" class="px-2 mt-4 hidden"></div> 
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // --- BUTTON LOADING HELPER ---
+        const setBtnLoad = (id, loading) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            if (loading) {
+                btn.dataset.oldText = btn.innerHTML; // Save text/icon
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xl"></i>';
+                btn.disabled = true;
+                btn.classList.add('opacity-75', 'cursor-not-allowed');
+            } else {
+                btn.innerHTML = btn.dataset.oldText || 'ตกลง';
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        };
+
+        // --- AUTH & INIT ---
+        const init = () => {
+            if(user) {
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('app-view').classList.remove('hidden');
+                document.getElementById('navUser').innerText = user.name;
+                renderMenu();
+            } else {
+                document.getElementById('login-view').classList.remove('hidden');
+                document.getElementById('app-view').classList.add('hidden');
+            }
+        };
+
+        const doLogin = async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('logUser').value;
+            const p = document.getElementById('logPass').value;
+            
+            setBtnLoad('btnLogin', true);
+            const res = await callAPI('login', {username:u, password:p}, false); // False = No global loader
+            setBtnLoad('btnLogin', false);
+
+            if(res && res.success) {
+                user = { username:u, role:res.role, name:res.name };
+                if(document.getElementById('remember').checked) localStorage.setItem('medamai_user', JSON.stringify(user));
+                init();
+            } else {
+                Swal.fire('ผิดพลาด', res ? res.message : 'Login Failed', 'error');
+            }
+        };
+
+        const doLogout = () => { localStorage.removeItem('medamai_user'); user=null; location.reload(); };
+        
+        const changePass = async () => {
+            const {value:p} = await Swal.fire({title:'เปลี่ยนรหัสผ่าน', input:'password', inputLabel:'รหัสผ่านใหม่', showCancelButton:true});
+            if(p) {
+                const res = await callAPI('updatePassword', {username:user.username, newPassword:p});
+                if(res.success) Swal.fire('สำเร็จ', 'เปลี่ยนรหัสผ่านแล้ว', 'success');
+            }
+        };
+
+        // --- MENU ---
+        const renderMenu = () => {
+            if(clockInterval) clearInterval(clockInterval);
+
+            document.getElementById('menu-grid').classList.remove('hidden');
+            document.getElementById('content-area').classList.add('hidden');
+            document.getElementById('content-area').innerHTML = ''; 
+
+            const grid = document.getElementById('menu-grid');
+            grid.innerHTML = '';
+            
+            const empMenu = [
+                {t:'ยอดขายประจำวัน', i:'fa-cash-register', c:'bg-emerald-500', fn:'pageSales'},
+                {t:'ลงเวลางาน', i:'fa-user-clock', c:'bg-blue-500', fn:'pageAttend'},
+                {t:'บันทึกซื้อของ', i:'fa-bag-shopping', c:'bg-orange-500', fn:'pageExpense'},
+                {t:'เงินเดือน', i:'fa-wallet', c:'bg-purple-500', fn:'pageMySalary'},
+                {t:'สต๊อคขนมปัง', i:'fa-bread-slice', c:'bg-amber-600', fn:'pageStock'}
+            ];
+            const ownMenu = [
+                {t:'จัดการบัญชี', i:'fa-chart-pie', c:'bg-indigo-600', fn:'pageOwnAccount'},
+                {t:'ระบบเงินเดือน', i:'fa-money-bill-wave', c:'bg-teal-600', fn:'pageOwnSalary'},
+                {t:'ระบบลงเวลา', i:'fa-calendar-check', c:'bg-blue-600', fn:'pageOwnTime'},
+                {t:'พิกัดร้าน', i:'fa-map-location-dot', c:'bg-red-500', fn:'pageOwnLoc'}
+            ];
+            
+            const items = user.role === 'เจ้าของร้าน' ? ownMenu : empMenu;
+            
+            items.forEach(m => {
+                grid.innerHTML += `
+                <div onclick="${m.fn}()" class="${m.c} text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center h-28 cursor-pointer active:scale-95 transition transform hover:scale-105">
+                    <i class="fa-solid ${m.i} text-3xl mb-2 opacity-90"></i>
+                    <span class="font-bold text-sm text-center">${m.t}</span>
+                </div>`;
+            });
+        };
+
+        // --- PAGES: EMPLOYEE & SHARED ---
+
+        const pageSales = async () => {
+            editSaleRowIndex = null; 
+            render(`
+                <h2 class="text-xl font-bold text-orange-600 mb-4 flex items-center gap-2"><i class="fa-solid fa-cash-register"></i> บันทึกยอดขายประจำวัน</h2>
+                
+                <div class="glass p-4 rounded-xl space-y-4 shadow-sm mb-4 border border-orange-100">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs text-gray-500 font-bold">วันที่ของยอดขาย</label>
+                        <button id="btnCancelEdit" onclick="cancelEditSale()" class="hidden text-xs text-red-500 hover:underline">ยกเลิกแก้ไข</button>
+                    </div>
+                    <input type="date" id="sDate" class="w-full border p-2 rounded-lg bg-white focus:ring-2 focus:ring-orange-200">
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-xs text-gray-500">เงินสด (ระบบ)</label><input type="number" id="sc1" class="w-full border p-2 rounded-lg" oninput="calcS()"></div>
+                        <div><label class="text-xs text-gray-500">เงินโอน (ระบบ)</label><input type="number" id="sc2" class="w-full border p-2 rounded-lg" oninput="calcS()"></div>
+                        <div><label class="text-xs text-gray-500 font-bold text-orange-700">เงินสด (นับจริง)</label><input type="number" id="sc3" class="w-full border-2 border-orange-200 p-2 rounded-lg" oninput="calcS()"></div>
+                        <div><label class="text-xs text-gray-500 font-bold text-orange-700">เงินโอน (นับจริง)</label><input type="number" id="sc4" class="w-full border-2 border-orange-200 p-2 rounded-lg" oninput="calcS()"></div>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-3 rounded-lg flex justify-between text-sm font-bold border">
+                        <span class="text-red-500">ขาด: <span id="sShort">0</span></span>
+                        <span class="text-green-500">เกิน: <span id="sOver">0</span></span>
+                    </div>
+                    
+                    <button id="btnSaveSale" onclick="saveSale()" class="w-full btn-primary py-3 rounded-xl font-bold shadow-md">บันทึกข้อมูล</button>
+                </div>
+                
+                <h3 class="font-bold text-gray-700 mb-2">ประวัติการบันทึกยอดขาย</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                            <tr>
+                                <th class="px-3 py-2 whitespace-nowrap">วันที่</th>
+                                <th class="px-3 py-2 whitespace-nowrap">สด(นับ)</th>
+                                <th class="px-3 py-2 whitespace-nowrap">โอน(นับ)</th>
+                                <th class="px-3 py-2 whitespace-nowrap">สถานะ</th>
+                                <th class="px-3 py-2 text-center whitespace-nowrap">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="saleHistTableBody"><tr><td colspan="5" class="text-center py-4">กำลังโหลด...</td></tr></tbody>
+                    </table>
+                </div>
+            `);
+            document.getElementById('sDate').valueAsDate = new Date();
+            loadSaleHist();
+        };
+
+        const calcS = () => {
+            const [v1,v2,v3,v4] = ['sc1','sc2','sc3','sc4'].map(i=>Number(document.getElementById(i).value)||0);
+            const diff = (v3+v4) - (v1+v2);
+            document.getElementById('sShort').innerText = diff < 0 ? Math.abs(diff) : 0;
+            document.getElementById('sOver').innerText = diff > 0 ? diff : 0;
+        };
+
+        const saveSale = async () => {
+            const data = {
+                date: val('sDate'), cashSys:val('sc1'), transSys:val('sc2'), cashCount:val('sc3'), transferCount:val('sc4'),
+                short:txt('sShort'), over:txt('sOver'), user:user.username
+            };
+            
+            setBtnLoad('btnSaveSale', true);
+            let res;
+            
+            if(editSaleRowIndex) {
+                data.rowIndex = editSaleRowIndex;
+                res = await callAPI('updateDailySale', data, false);
+                if(res.success) { Swal.fire('สำเร็จ', 'แก้ไขข้อมูลเรียบร้อยแล้ว', 'success'); pageSales(); }
+            } else {
+                res = await callAPI('saveDailySale', data, false);
+                if(res.success) { Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อย', 'success'); pageSales(); }
+            }
+            setBtnLoad('btnSaveSale', false);
+        };
+
+        const loadSaleHist = async () => {
+            const res = await callAPI('getDailySales');
+            const tbody = document.getElementById('saleHistTableBody');
+            if(!res.data || res.data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4">ไม่มีข้อมูล</td></tr>'; return; }
+            tbody.innerHTML = res.data.map((r, index) => {
+                const statusHtml = r[5] > 0 ? `<span class="text-red-500 font-bold text-xs">ขาด ${r[5]}</span>` : (r[6] > 0 ? `<span class="text-green-500 font-bold text-xs">เกิน ${r[6]}</span>` : `<span class="text-gray-400 text-xs">ปกติ</span>`);
+                const rowData = encodeURIComponent(JSON.stringify(r));
+                const rowIndex = index + 2; 
+                return `<tr class="bg-white border-b hover:bg-gray-50"><td class="px-3 py-3" onclick="showSaleDetail('${rowData}')">${fmtDate(r[0])}</td><td class="px-3 py-3" onclick="showSaleDetail('${rowData}')">${Number(r[3]).toLocaleString()}</td><td class="px-3 py-3" onclick="showSaleDetail('${rowData}')">${Number(r[4]).toLocaleString()}</td><td class="px-3 py-3" onclick="showSaleDetail('${rowData}')">${statusHtml}</td><td class="px-3 py-3 text-center whitespace-nowrap"><button onclick="showSaleDetail('${rowData}')" class="text-gray-500 hover:text-gray-700 mx-1"><i class="fa-solid fa-eye"></i></button><button onclick="startEditSale(${rowIndex}, '${rowData}')" class="text-blue-500 hover:text-blue-700 mx-1"><i class="fa-solid fa-pen"></i></button><button onclick="deleteSale(${rowIndex})" class="text-red-500 hover:text-red-700 mx-1"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            }).reverse().join(''); 
+        };
+
+        const startEditSale = (rowIndex, encodedData) => {
+            const r = JSON.parse(decodeURIComponent(encodedData));
+            const d = new Date(r[0]);
+            const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
+            document.getElementById('sDate').value = `${yyyy}-${mm}-${dd}`;
+            document.getElementById('sc1').value = r[1]; document.getElementById('sc2').value = r[2]; document.getElementById('sc3').value = r[3]; document.getElementById('sc4').value = r[4];
+            calcS(); 
+            editSaleRowIndex = rowIndex;
+            const btn = document.getElementById('btnSaveSale'); btn.innerText = 'ยืนยันแก้ไข'; btn.classList.remove('btn-primary'); btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            document.getElementById('btnCancelEdit').classList.remove('hidden');
+            document.getElementById('content-area').scrollIntoView({behavior: 'smooth'});
+        };
+
+        const cancelEditSale = () => { pageSales(); };
+
+        const showSaleDetail = (encodedData) => {
+            const r = JSON.parse(decodeURIComponent(encodedData));
+            Swal.fire({ title: 'รายละเอียดยอดขาย', html: `<div class="text-left space-y-2 text-sm p-2"><div class="flex justify-between border-b pb-1"><strong>วันที่:</strong> <span>${fmtDate(r[0])}</span></div><div class="flex justify-between"><span>เงินสด(ระบบ):</span> <span>${Number(r[1]).toLocaleString()}</span></div><div class="flex justify-between"><span>เงินโอน(ระบบ):</span> <span>${Number(r[2]).toLocaleString()}</span></div><div class="flex justify-between font-bold text-blue-600"><span>เงินสด(นับได้):</span> <span>${Number(r[3]).toLocaleString()}</span></div><div class="flex justify-between font-bold text-blue-600"><span>เงินโอน(นับได้):</span> <span>${Number(r[4]).toLocaleString()}</span></div><hr class="my-2"><div class="flex justify-between text-red-500"><strong>เงินขาด:</strong> <span>${r[5]}</span></div><div class="flex justify-between text-green-500"><strong>เงินเกิน:</strong> <span>${r[6]}</span></div><div class="flex justify-between mt-2 text-gray-500 text-xs"><span>ผู้บันทึก:</span> <span>${r[7]}</span></div></div>`, confirmButtonText: 'ปิด', confirmButtonColor: '#F97316' });
+        };
+
+        const deleteSale = async (rowIndex) => {
+            const result = await Swal.fire({ title: 'ยืนยันการลบ?', text: "ข้อมูลจะถูกลบถาวรจาก Google Sheet", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'ลบข้อมูล', cancelButtonText: 'ยกเลิก' });
+            if (result.isConfirmed) { const res = await callAPI('deleteDailySale', { rowIndex: rowIndex }); if(res.success) { Swal.fire('ลบสำเร็จ', 'ข้อมูลถูกลบเรียบร้อยแล้ว', 'success'); loadSaleHist(); } }
+        };
+
+        // *** UPDATED: Page Attend with new formatting ***
+        const pageAttend = () => {
+            // Display formatted date
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const dateStr = `${day}/${month}/${year}`;
+
+            render(`
+                <h2 class="text-xl font-bold text-orange-600 mb-4"><i class="fa-solid fa-clock"></i> ลงเวลางาน</h2>
+                <div class="text-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-orange-100">
+                     <div class="text-4xl font-bold text-gray-800 font-mono tracking-widest" id="clk">00:00</div>
+                     <div class="text-gray-500 mt-1 font-medium">${dateStr}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <button id="btnCheckIn" onclick="checkIn('in')" class="bg-gradient-to-b from-green-400 to-green-600 text-white p-4 rounded-2xl shadow-lg active:scale-95 transition transform hover:scale-105 flex flex-col items-center justify-center h-32 border-b-4 border-green-700">
+                        <i class="fa-solid fa-stopwatch text-4xl mb-2 drop-shadow-md"></i><span class="font-bold text-lg">ลงเวลามา</span>
+                    </button>
+                    <button id="btnCheckOut" onclick="checkIn('out')" class="bg-gradient-to-b from-red-400 to-red-600 text-white p-4 rounded-2xl shadow-lg active:scale-95 transition transform hover:scale-105 flex flex-col items-center justify-center h-32 border-b-4 border-red-700">
+                        <i class="fa-solid fa-right-from-bracket text-4xl mb-2 drop-shadow-md"></i><span class="font-bold text-lg">ลงเวลากลับ</span>
+                    </button>
+                </div>
+                <h3 class="font-bold text-gray-700 mb-2 border-l-4 border-orange-500 pl-2">ประวัติการลงเวลา (เดือนนี้)</h3>
+                <div class="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100"><tr><th class="px-3 py-3 bg-gray-50">วันที่</th><th class="px-3 py-3 bg-green-50 text-green-800 text-center">มา</th><th class="px-3 py-3 bg-red-50 text-red-800 text-center">กลับ</th><th class="px-3 py-3 text-center">สถานะ</th></tr></thead>
+                        <tbody id="attendHistTableBody" class="bg-white divide-y divide-gray-200"><tr><td colspan="4" class="text-center py-4">กำลังโหลด...</td></tr></tbody>
+                    </table>
+                </div>
+            `);
+            const updateTime = () => { const el = document.getElementById('clk'); if(el) el.innerText = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}); };
+            updateTime(); clockInterval = setInterval(updateTime, 1000); loadAttendHistory();
+        };
+
+        const loadAttendHistory = async () => {
+            const res = await callAPI('getAttendance');
+            const tbody = document.getElementById('attendHistTableBody');
+            if(!res.data || res.data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">ยังไม่มีประวัติ</td></tr>'; return; }
+            const userRecords = res.data.filter(r => r[5] === user.username);
+            const groupedData = {};
+            userRecords.forEach(r => {
+                const dateKey = fmtDMY(r[0]); 
+                if(!groupedData[dateKey]) { 
+                    groupedData[dateKey] = { dateRaw: r[0], displayDate: dateKey, timeIn: '-', timeOut: '-', status: '-', lateMin: 0 }; 
+                }
+                if(r[1]) { groupedData[dateKey].timeIn = r[1]; groupedData[dateKey].status = r[3]; groupedData[dateKey].lateMin = r[4]; }
+                if(r[2]) groupedData[dateKey].timeOut = r[2];
+            });
+
+            const parseDate = (dStr) => {
+                if(typeof dStr === 'string' && dStr.includes('/')) {
+                    const p = dStr.split('/');
+                    return new Date(`${p[2]}-${p[1]}-${p[0]}`);
+                }
+                return new Date(dStr);
+            };
+
+            const sortedHistory = Object.values(groupedData).sort((a, b) => parseDate(b.dateRaw) - parseDate(a.dateRaw));
+            tbody.innerHTML = sortedHistory.map(row => {
+                let statusBadge = '<span class="px-2 py-1 rounded-full text-xs bg-gray-100">ปกติ</span>';
+                if(row.status === 'สาย') { statusBadge = `<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-600 font-bold">สาย ${row.lateMin} น.</span>`; }
+                return `<tr class="hover:bg-gray-50 transition"><td class="px-3 py-3 whitespace-nowrap font-medium text-gray-900">${row.displayDate}</td><td class="px-3 py-3 text-center text-green-600 font-bold">${row.timeIn}</td><td class="px-3 py-3 text-center text-red-600 font-bold">${row.timeOut}</td><td class="px-3 py-3 text-center">${statusBadge}</td></tr>`;
+            }).join('');
+        };
+
+        const checkIn = async (type) => {
+            if(!navigator.geolocation) return Swal.fire('Error','อุปกรณ์ไม่รองรับ GPS','error');
+            
+            const btnId = type === 'in' ? 'btnCheckIn' : 'btnCheckOut';
+            setBtnLoad(btnId, true);
+
+            // Generate strict custom formatted Date/Time strings for backend
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const dateStr = `${day}/${month}/${year}`;
+            
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const timeStr = `${hh}:${mm}`;
+
+            navigator.geolocation.getCurrentPosition(async pos => {
+                const {latitude:lat, longitude:lng} = pos.coords;
+                const locData = await callAPI('getLocation', {}, false); 
+                const store = locData.data ? locData.data[0] : null; 
+                
+                if(!store) { setBtnLoad(btnId, false); return Swal.fire('Error','เจ้าของร้านยังไม่กำหนดพิกัดร้าน','warning'); }
+                
+                const dist = getDist(lat, lng, store[0], store[1]);
+                const radius = store[2] || 100;
+                
+                if(dist > radius) { 
+                    setBtnLoad(btnId, false);
+                    return Swal.fire('ไม่อยู่ในพื้นที่',`คุณอยู่ห่างจากร้าน ${Math.floor(dist)} เมตร (กำหนดไว้ ${radius} ม.)`,'error'); 
+                }
+                
+                let status = 'ปกติ'; let lateMinutes = 0;
+                if(type === 'in') {
+                    const rules = await callAPI('getLateRules', {}, false);
+                    if(rules.data && rules.data[0]) {
+                        const lateRuleTime = rules.data[0][1]; 
+                        if(lateRuleTime) {
+                            const now = new Date(); const [h, m] = lateRuleTime.split(':').map(Number);
+                            const ruleDate = new Date(); ruleDate.setHours(h, m, 0, 0);
+                            if(now > ruleDate) { status = 'สาย'; const diffMs = now - ruleDate; lateMinutes = Math.floor(diffMs / 60000); }
+                        }
+                    }
+                }
+                
+                // Sending formatted strings via API
+                const res = await callAPI('recordAttendance', { 
+                    type, 
+                    status, 
+                    lateMinutes, 
+                    lat, 
+                    lng, 
+                    user: user.username,
+                    recordDate: dateStr, // Explicitly send dd/mm/yyyy
+                    recordTime: timeStr  // Explicitly send hh:mm
+                }, false);
+                setBtnLoad(btnId, false);
+
+                if(res.success) {
+                    Swal.fire({ icon: 'success', title: type === 'in' ? 'สวัสดีครับ/ค่ะ' : 'เดินทางปลอดภัยครับ/ค่ะ', text: type === 'in' && status === 'สาย' ? `คุณมาสาย ${lateMinutes} นาที` : 'บันทึกเวลาเรียบร้อย', timer: 2000, showConfirmButton: false });
+                    loadAttendHistory(); 
+                }
+            }, (err) => { 
+                setBtnLoad(btnId, false); 
+                Swal.fire('GPS Error', 'ไม่สามารถระบุพิกัดได้: ' + err.message, 'error'); 
+            });
+        };
+
+        const pageExpense = async () => {
+            editExpenseRowIndex = null;
+            const pcRes = await callAPI('getPettyCashConfig', { user: user.username });
+            const latestReceived = pcRes.latestReceived || 0;
+            const currentBalance = pcRes.currentBalance || 0;
+            
+            const resExp = await callAPI('getExpenses');
+            allExpenseData = resExp.data || [];
+            
+            const shops = [...new Set(allExpenseData.map(r => r[1]))];
+
+            const myAlloc = pcRes.data.filter(r => r[3] === user.username).map(r => ({
+                date: new Date(r[0]),
+                amount: Number(r[2]),
+                type: 'in'
+            }));
+
+            const myExp = allExpenseData.filter(r => r[5] === user.username).map((r, i) => ({
+                date: new Date(r[0]),
+                amount: Number(r[2]),
+                type: 'out',
+                originalRow: r,
+                originalIndex: i 
+            }));
+
+            const timeline = [...myAlloc, ...myExp].sort((a,b) => a.date - b.date);
+
+            let bal = 0;
+            const expenseWithBalance = []; 
+
+            timeline.forEach(item => {
+                if(item.type === 'in') {
+                    bal += item.amount;
+                } else {
+                    bal -= item.amount;
+                    const rowWithBal = [...item.originalRow, bal];
+                    expenseWithBalance.push({
+                        row: rowWithBal,
+                        originalIndex: item.originalIndex
+                    });
+                }
+            });
+
+            const rowsToRender = expenseWithBalance.map(x => x.row);
+
+            render(`
+                <h2 class="text-xl font-bold text-orange-600 mb-4"><i class="fa-solid fa-bag-shopping"></i> บันทึกซื้อของ</h2>
+                <div class="grid grid-cols-2 gap-4 mb-4"><div class="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl text-white shadow-lg"><div class="text-xs opacity-80">ได้รับล่าสุด</div><div class="text-2xl font-bold">${Number(latestReceived).toLocaleString()}</div></div><div class="bg-gradient-to-br from-orange-500 to-orange-600 p-4 rounded-xl text-white shadow-lg"><div class="text-xs opacity-80">คงเหลือสะสม</div><div class="text-2xl font-bold">${Number(currentBalance).toLocaleString()}</div></div></div>
+                <div class="glass p-4 rounded-xl space-y-4 mb-4 border border-orange-100">
+                    <div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-gray-500">วันที่</label><input type="date" id="exDate" class="w-full border p-2 rounded-lg bg-white"></div><div><label class="text-xs text-gray-500">ร้านค้า</label><input list="shopList" type="text" id="exShop" placeholder="ระบุ/เลือก" class="w-full border p-2 rounded-lg"><datalist id="shopList">${shops.map(s => `<option value="${s}">`).join('')}</datalist></div></div>
+                    <div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-gray-500">จำนวนเงิน</label><input type="text" id="exAmt" placeholder="0.00" class="w-full border p-2 rounded-lg" oninput="fmtMoney(this)"></div><div><label class="text-xs text-gray-500">ประเภทเงิน</label><select id="exType" class="w-full border p-2 rounded-lg bg-white" onchange="toggleSlip()"><option value="เงินสด">เงินสด</option><option value="เงินโอน">เงินโอน</option><option value="เงินเชื่อ">เงินเชื่อ</option></select></div></div>
+                    <div><label class="block text-xs text-gray-500 mb-1">รูปใบเสร็จ <span class="text-red-500">* (บังคับ)</span></label><input type="file" id="exImg" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"></div>
+                    <div id="divSlip" class="hidden animate-fade-in"><label class="block text-xs text-gray-500 mb-1">สลิปการโอน <span class="text-red-500">* (บังคับเมื่อโอน)</span></label><input type="file" id="exSlip" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"></div>
+                    <button id="btnSaveExp" onclick="saveExp()" class="w-full btn-primary py-3 rounded-xl font-bold shadow-md">บันทึกข้อมูล</button>
+                </div>
+                <h3 class="font-bold text-gray-700 mb-2 border-l-4 border-orange-500 pl-2">ประวัติการบันทึกรายจ่าย</h3>
+                <div class="overflow-x-auto rounded-lg border">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                            <tr>
+                                <th class="px-3 py-2 whitespace-nowrap">วันที่</th>
+                                <th class="px-3 py-2 whitespace-nowrap">รายการ</th>
+                                <th class="px-3 py-2 whitespace-nowrap text-right">จำนวน</th>
+                                <th class="px-3 py-2 whitespace-nowrap text-right">คงเหลือ</th>
+                                <th class="px-3 py-2 text-center whitespace-nowrap">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expTableBody">
+                            ${renderExpRowsWithBalance(rowsToRender)}
+                        </tbody>
+                    </table>
+                </div>
+            `);
+            document.getElementById('exDate').valueAsDate = new Date();
+        };
+
+        const toggleSlip = () => { const t = document.getElementById('exType').value; document.getElementById('divSlip').classList.toggle('hidden', t!=='เงินโอน'); };
+        const fmtMoney = (el) => { let v = el.value.replace(/[^0-9.]/g, ''); if(v) { el.value = Number(v).toLocaleString(); } else el.value = ''; }; 
+        
+        const renderExpRowsWithBalance = (data) => {
+            if(!data || data.length === 0) return '<tr><td colspan="5" class="text-center py-4">ไม่มีข้อมูล</td></tr>';
+            return data.slice().reverse().map((r) => {
+                const balanceVal = r[7] !== undefined ? Number(r[7]).toLocaleString() : '-';
+                return `
+                <tr class="bg-white border-b hover:bg-gray-50 cursor-pointer" onclick="showExpDetail('${r[0]}','${r[1]}','${r[2]}','${r[3]}','${r[4]}','${r[5]}')">
+                    <td class="px-3 py-3">${fmtDate(r[0])}</td>
+                    <td class="px-3 py-3 font-medium text-gray-900 truncate max-w-[100px]">${r[1]}</td>
+                    <td class="px-3 py-3 text-right text-red-600 font-bold">${Number(r[2]).toLocaleString()}</td>
+                    <td class="px-3 py-3 text-right text-green-600 font-bold bg-green-50">${balanceVal}</td>
+                    <td class="px-3 py-3 text-center whitespace-nowrap" onclick="event.stopPropagation()">
+                         <button onclick="editExpAlert()" class="text-blue-500 hover:text-blue-700 mx-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                         <button onclick="delExpAlert('unknown')" class="text-red-500 hover:text-red-700 mx-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+        };
+
+        const showExpDetail = (date, shop, amt, type, url, user) => { Swal.fire({ title: 'รายละเอียดรายจ่าย', html: `<div class="text-left space-y-2 text-sm"><p><strong>วันที่:</strong> ${fmtDate(date)}</p><p><strong>ร้านค้า:</strong> ${shop}</p><p><strong>จำนวนเงิน:</strong> ${Number(amt).toLocaleString()} บาท</p><p><strong>ประเภท:</strong> ${type}</p><p><strong>ผู้บันทึก:</strong> ${user}</p>${url ? `<div class="mt-2 text-center"><img src="${url}" class="max-h-48 mx-auto rounded border shadow-sm"></div>` : ''}</div>`, confirmButtonText: 'ปิด', confirmButtonColor: '#F97316' }); };
+        const editExpAlert = () => Swal.fire('แจ้งเตือน', 'กรุณาแก้ไขข้อมูลผ่าน Google Sheet โดยตรงในขณะนี้', 'info');
+        const delExpAlert = async (rowIndex) => {
+             Swal.fire('แจ้งเตือน', 'กรุณาลบข้อมูลผ่าน Google Sheet โดยตรง (โหมดแสดงผลยอดคงเหลือ)', 'info');
+        };
+
+        const saveExp = async () => {
+            const date = val('exDate'), shop = val('exShop'), amtStr = val('exAmt').replace(/,/g, ''), type = val('exType'), fImg = document.getElementById('exImg').files[0], fSlip = document.getElementById('exSlip').files[0];
+            if(!date || !shop || !amtStr) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกวันที่ ร้านค้า และจำนวนเงิน', 'warning');
+            if(!fImg) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาแนบรูปใบเสร็จ', 'warning');
+            if(type === 'เงินโอน' && !fSlip) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาแนบสลิปการโอน', 'warning');
+            
+            setBtnLoad('btnSaveExp', true);
+            const b64 = await toBase64(fImg);
+            const res = await callAPI('saveExpense', { date, shop, amount: amtStr, type, imageBase64: b64, user: user.username, isNewShop: true }, false);
+            setBtnLoad('btnSaveExp', false);
+
+            if(res.success) {
+                Swal.fire('สำเร็จ','บันทึกข้อมูลและอัปเดตยอดคงเหลือเรียบร้อย','success'); 
+                pageExpense(); 
+            }
+        };
+
+        // *** UPDATED: Page Stock ***
+        const pageStock = async () => {
+            editStockRowIndex = null;
+            render(`
+                 <h2 class="text-xl font-bold text-orange-600 mb-4"><i class="fa-solid fa-bread-slice"></i> สต๊อคขนมปัง</h2>
+                 <div class="glass p-4 rounded-xl space-y-4 shadow-sm border border-orange-100">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs text-gray-500 font-bold">วันที่</label>
+                        <button id="btnCancelEditStock" onclick="cancelEditStock()" class="hidden text-xs text-red-500 hover:underline">ยกเลิกแก้ไข</button>
+                    </div>
+                    <input type="date" id="stkDate" class="w-full border p-2 rounded-lg bg-white">
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold">จำนวนเบิก (ลูก)</label>
+                            <input type="number" id="stkW" placeholder="0" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-orange-200" oninput="calStk()">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold">คงเหลือ (ลูก)</label>
+                            <input type="number" id="stkR" placeholder="0" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-orange-200" oninput="calStk()">
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-sm text-gray-600">ยอดขายจริง (คำนวณ):</span>
+                            <span class="font-bold text-xl text-orange-600" id="stkSold">0</span>
+                        </div>
+                        <div class="border-t border-dashed pt-3">
+                            <label class="text-xs text-gray-500 font-bold mb-1 block">จำนวนในใบออเดอร์ (ลูก)</label>
+                            <input type="number" id="stkOrder" placeholder="กรอกจำนวนตามบิล" class="w-full border p-2 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-200" oninput="calStk()">
+                        </div>
+                    </div>
+
+                    <!-- Comparison Result Display -->
+                    <div id="stkStatus" class="hidden p-4 rounded-lg text-center text-sm font-bold animate-fade-in"></div>
+
+                    <button id="btnSaveStock" onclick="saveStk()" class="w-full btn-primary py-3 rounded-xl font-bold shadow-md">บันทึกสต๊อค</button>
+                 </div>
+
+                 <h3 class="font-bold text-gray-700 mb-2 mt-4 border-l-4 border-orange-500 pl-2">ประวัติสต๊อคขนมปัง</h3>
+                 <div class="overflow-x-auto rounded-lg border">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                            <tr>
+                                <th class="px-3 py-2 whitespace-nowrap">วันที่</th>
+                                <th class="px-3 py-2 whitespace-nowrap">เบิก</th>
+                                <th class="px-3 py-2 whitespace-nowrap">เหลือ</th>
+                                <th class="px-3 py-2 whitespace-nowrap">ขาย</th>
+                                <th class="px-3 py-2 whitespace-nowrap">บิล</th>
+                                <th class="px-3 py-2 text-center whitespace-nowrap">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stkHistoryBody"><tr><td colspan="6" class="text-center py-4">กำลังโหลด...</td></tr></tbody>
+                    </table>
+                 </div>
+            `);
+            document.getElementById('stkDate').valueAsDate = new Date();
+            loadStockHistory();
+        };
+
+        const calStk = () => {
+            const w = Number(val('stkW')) || 0;
+            const r = Number(val('stkR')) || 0;
+            const sold = Math.max(0, w - r);
+            document.getElementById('stkSold').innerText = sold;
+
+            const orderVal = val('stkOrder');
+            const statusDiv = document.getElementById('stkStatus');
+            
+            let orderCount = 0;
+            let diff = 0;
+            
+            if (orderVal !== '') {
+                orderCount = Number(orderVal);
+                diff = sold - orderCount; 
+                statusDiv.classList.remove('hidden');
+
+                if (diff === 0) {
+                    statusDiv.className = "p-4 rounded-lg text-center text-sm font-bold bg-green-100 text-green-700 border border-green-200";
+                    statusDiv.innerHTML = `<i class="fa-solid fa-circle-check text-lg mb-1"></i><br>ยอดครบถ้วนถูกต้อง`;
+                } else if (diff > 0) {
+                    statusDiv.className = "p-4 rounded-lg text-center text-sm font-bold bg-red-100 text-red-700 border border-red-200";
+                    statusDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-lg mb-1"></i><br>ของหาย/ขาดจำนวน ${diff} ลูก`;
+                } else {
+                    statusDiv.className = "p-4 rounded-lg text-center text-sm font-bold bg-yellow-100 text-yellow-700 border border-yellow-200";
+                    statusDiv.innerHTML = `<i class="fa-solid fa-clipboard-question text-lg mb-1"></i><br>ของเกิน/เบิกเกินจริง ${Math.abs(diff)} ลูก`;
+                }
+            } else {
+                statusDiv.classList.add('hidden');
+            }
+        };
+
+        const saveStk = async () => {
+            const w = Number(val('stkW')) || 0;
+            const r = Number(val('stkR')) || 0;
+            const sold = Math.max(0, w - r);
+            const orderVal = val('stkOrder');
+            const date = val('stkDate');
+            
+            let orderCount = 0;
+            let statusDiff = '-';
+
+            if (orderVal !== '') {
+                orderCount = Number(orderVal);
+                const diff = sold - orderCount;
+                if (diff === 0) statusDiff = 'ครบถ้วน';
+                else if (diff > 0) statusDiff = `ของหาย/ขาด ${diff}`;
+                else statusDiff = `ของเกิน ${Math.abs(diff)}`;
+            }
+
+            const payload = {
+                date: date,
+                withdraw: w, 
+                remaining: r, 
+                sold: sold, 
+                orderCount: orderCount,
+                statusDiff: statusDiff,
+                user: user.username
+            };
+            
+            setBtnLoad('btnSaveStock', true);
+            let res;
+            if (editStockRowIndex) {
+                payload.rowIndex = editStockRowIndex;
+                res = await callAPI('updateBreadStock', payload, false);
+                if(res.success) { Swal.fire('สำเร็จ', 'แก้ไขเรียบร้อย', 'success'); pageStock(); }
+            } else {
+                res = await callAPI('saveBreadStock', payload, false);
+                if(res.success) {
+                    Swal.fire('สำเร็จ', 'บันทึกเรียบร้อย', 'success');
+                    document.getElementById('stkW').value=''; document.getElementById('stkR').value=''; document.getElementById('stkOrder').value=''; document.getElementById('stkSold').innerText='0'; document.getElementById('stkStatus').classList.add('hidden');
+                    loadStockHistory();
+                }
+            }
+            setBtnLoad('btnSaveStock', false);
+        };
+
+        const loadStockHistory = async () => {
+            const res = await callAPI('getBreadStock');
+            const tbody = document.getElementById('stkHistoryBody');
+            
+            if(!res.data || res.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-400">ยังไม่มีข้อมูล</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = res.data.map((r, index) => {
+                const rowIndex = index + 2; 
+                const rowData = encodeURIComponent(JSON.stringify(r));
+                
+                return `
+                <tr class="bg-white border-b hover:bg-gray-50">
+                    <td class="px-3 py-3 whitespace-nowrap text-xs">${fmtDate(r[0])}</td>
+                    <td class="px-3 py-3 text-center">${r[2]}</td>
+                    <td class="px-3 py-3 text-center">${r[3]}</td>
+                    <td class="px-3 py-3 text-center font-bold text-orange-600">${r[4]}</td>
+                    <td class="px-3 py-3 text-center">${r[5] || '-'}</td>
+                    <td class="px-3 py-3 text-center whitespace-nowrap">
+                         <button onclick="startEditStock(${rowIndex}, '${rowData}')" class="text-blue-500 hover:text-blue-700 mx-1"><i class="fa-solid fa-pen"></i></button>
+                         <button onclick="deleteStock(${rowIndex})" class="text-red-500 hover:text-red-700 mx-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).reverse().join('');
+        };
+
+        const startEditStock = (rowIndex, encodedData) => {
+            const r = JSON.parse(decodeURIComponent(encodedData));
+            // r: [Date, Time, Withdraw, Remain, Sold, Order, Diff, User]
+            const d = new Date(r[0]);
+            const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
+            document.getElementById('stkDate').value = `${yyyy}-${mm}-${dd}`;
+            document.getElementById('stkW').value = r[2];
+            document.getElementById('stkR').value = r[3];
+            document.getElementById('stkOrder').value = r[5] == 0 ? '' : r[5];
+            
+            calStk(); // Recalc
+            
+            editStockRowIndex = rowIndex;
+            const btn = document.getElementById('btnSaveStock');
+            btn.innerText = 'ยืนยันแก้ไข';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            
+            document.getElementById('btnCancelEditStock').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const cancelEditStock = () => { pageStock(); };
+
+        const deleteStock = async (rowIndex) => {
+            const result = await Swal.fire({ title: 'ยืนยันลบ?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'ลบ' });
+            if (result.isConfirmed) {
+                await callAPI('deleteBreadStock', { rowIndex });
+                Swal.fire('ลบแล้ว', '', 'success');
+                loadStockHistory();
+            }
+        };
+
+        const pageMySalary = async () => {
+            render(`<h2 class="text-xl font-bold text-orange-600 mb-4">เงินเดือนของฉัน</h2><div class="bg-purple-50 border border-purple-100 p-6 rounded-2xl text-center"><div class="text-purple-800 text-sm">รอเจ้าของร้านคำนวณ</div></div>`);
+        };
+
+        // --- PAGES: OWNER ---
+        const pageOwnAccount = () => render(`<h2 class="text-xl font-bold text-indigo-600 mb-4">จัดการบัญชี</h2><div class="grid grid-cols-2 gap-3 mb-4"><button onclick="pageOwnSalesView()" class="bg-white p-3 rounded-xl shadow text-sm">ยอดขายประจำวัน</button><button onclick="pageExpense()" class="bg-white p-3 rounded-xl shadow text-sm">บันทึกรายจ่าย</button><button onclick="pageOwnPettyCash()" class="bg-white p-3 rounded-xl shadow text-sm">จัดการเงินสำรองจ่าย</button><button onclick="pageCredit()" class="bg-white p-3 rounded-xl shadow text-sm">จัดการเงินเชื่อ</button><button onclick="pageSummary()" class="bg-white p-3 rounded-xl shadow text-sm">สรุปบัญชี</button></div>`);
+        
+        // *** UPDATED: PAGE OWN SALARY ***
+        const pageOwnSalary = () => {
+            render(`
+                <h2 class="text-xl font-bold text-teal-600 mb-4">ระบบเงินเดือน</h2>
+                <div class="grid grid-cols-1 gap-4 mb-4">
+                    <button onclick="pagePaySalary()" class="bg-white p-4 rounded-xl shadow-lg border-l-4 border-teal-500 flex items-center justify-between hover:bg-teal-50">
+                        <span class="font-bold text-gray-700">จ่ายเงินเดือน</span>
+                        <i class="fa-solid fa-money-bill-wave text-teal-500 text-xl"></i>
+                    </button>
+                    <button onclick="pageSetWage()" class="bg-white p-4 rounded-xl shadow-lg border-l-4 border-blue-500 flex items-center justify-between hover:bg-blue-50">
+                        <span class="font-bold text-gray-700">ตั้งค่าค่าแรง</span>
+                        <i class="fa-solid fa-user-tag text-blue-500 text-xl"></i>
+                    </button>
+                    <button onclick="pageSetLate()" class="bg-white p-4 rounded-xl shadow-lg border-l-4 border-red-500 flex items-center justify-between hover:bg-red-50">
+                        <span class="font-bold text-gray-700">ตั้งค่าหักเงินเข้างานสาย</span>
+                        <i class="fa-solid fa-clock text-red-500 text-xl"></i>
+                    </button>
+                </div>
+            `);
+        };
+
+        // *** SUB-PAGE: PAY SALARY ***
+        const pagePaySalary = async () => {
+            render(`
+                <h2 class="text-xl font-bold text-teal-600 mb-4"><i class="fa-solid fa-money-bill-1-wave"></i> จ่ายเงินเดือน</h2>
+                
+                <div class="glass p-4 rounded-xl space-y-4 mb-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-xs text-gray-500">เริ่ม</label><input type="date" id="pStart" class="w-full border p-2 rounded"></div>
+                        <div><label class="text-xs text-gray-500">สิ้นสุด</label><input type="date" id="pEnd" class="w-full border p-2 rounded"></div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">พนักงาน</label>
+                        <select id="pEmp" class="w-full border p-2 rounded bg-white"><option>กำลังโหลด...</option></select>
+                    </div>
+                    <button id="btnCheckWorkDays" onclick="checkWorkDays()" class="w-full btn-primary py-2 rounded shadow">ตรวจสอบวันทำงาน</button>
+                </div>
+
+                <div id="checkListArea" class="hidden space-y-3">
+                    <h3 class="font-bold text-gray-700 border-b pb-1">รายการวันทำงานที่ยังไม่จ่าย</h3>
+                    <div id="checkListItems" class="max-h-60 overflow-y-auto bg-white p-2 rounded border"></div>
+                    <button id="btnCalcPayroll" onclick="calcPayroll()" class="w-full bg-blue-600 text-white py-2 rounded shadow hover:bg-blue-700">คำนวณเงินเดือน</button>
+                </div>
+
+                <div id="payrollResult" class="hidden mt-4 animate-fade-in"></div>
+            `);
+            
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            document.getElementById('pStart').valueAsDate = firstDay;
+            document.getElementById('pEnd').valueAsDate = now;
+
+            const res = await callAPI('getUsers');
+            const sel = document.getElementById('pEmp');
+            sel.innerHTML = res.data.filter(u=>u[2]!='เจ้าของร้าน').map(u=>`<option value="${u[0]}">${u[3]}</option>`).join('');
+        };
+
+        // *** FIX: checkWorkDays with robust date parsing ***
+        const checkWorkDays = async () => {
+            const emp = val('pEmp');
+            const s = val('pStart');
+            const e = val('pEnd');
+            if(!emp || !s || !e) return Swal.fire('Error','กรอกข้อมูลให้ครบ','error');
+
+            setBtnLoad('btnCheckWorkDays', true);
+            const res = await callAPI('getUnpaidDays', {employee:emp, start:s, end:e}, false);
+            setBtnLoad('btnCheckWorkDays', false);
+
+            const listDiv = document.getElementById('checkListItems');
+            const area = document.getElementById('checkListArea');
+            
+            if(!res.data || res.data.length === 0) {
+                area.classList.add('hidden');
+                return Swal.fire('ไม่พบข้อมูล','ไม่มีวันทำงานที่ค้างจ่ายในช่วงเวลานี้','info');
+            }
+
+            area.classList.remove('hidden');
+            document.getElementById('payrollResult').classList.add('hidden'); 
+
+            // *** UPDATED: Helper to parse date string strictly to Date object for sorting ***
+            const parseDateSafe = (dStr) => {
+                // If it's already "dd/mm/yyyy" from backend (which is text)
+                if(typeof dStr === 'string' && dStr.includes('/')) {
+                    const p = dStr.split('/');
+                    // Convert to yyyy-mm-dd for standard Date parsing if needed or use specific logic
+                    return new Date(`${p[2]}-${p[1]}-${p[0]}`);
+                }
+                // Fallback for standard formats
+                return new Date(dStr);
+            };
+
+            const uniqueData = [];
+            const seen = new Set();
+            // Sort by date ascending using safe parser
+            res.data.sort((a,b) => parseDateSafe(a[0]) - parseDateSafe(b[0]));
+            
+            res.data.forEach(r => {
+                // Handle duplication logic: use the raw string as key if it's consistent, or formatted
+                // Since backend now sends consistent 'dd/mm/yyyy', we can use r[0] directly if string.
+                // But to be safe, use fmtDMY to normalize.
+                const dKey = fmtDMY(r[0]); 
+                if(!seen.has(dKey)) {
+                    seen.add(dKey);
+                    uniqueData.push(r);
+                } 
+            });
+
+            listDiv.innerHTML = uniqueData.map((r, i) => `
+                <label class="flex items-center space-x-2 p-2 hover:bg-gray-50 border-b last:border-0">
+                    <input type="checkbox" class="work-day-cb form-checkbox h-5 w-5 text-teal-600" value="${r[0]}" checked>
+                    <span class="text-sm">
+                        ${fmtDMY(r[0])} 
+                        ${r[3] === 'สาย' ? `<span class="text-red-500 text-xs">(สาย ${r[4]} น.)</span>` : ''}
+                    </span>
+                </label>
+            `).join('');
+        };
+
+        const calcPayroll = async () => {
+            const cbs = document.querySelectorAll('.work-day-cb:checked');
+            if(cbs.length === 0) return Swal.fire('Warning','เลือกวันอย่างน้อย 1 วัน','warning');
+            
+            const selectedDates = Array.from(cbs).map(cb => cb.value);
+            
+            setBtnLoad('btnCalcPayroll', true);
+            const res = await callAPI('calculatePayroll', {
+                employee: val('pEmp'),
+                dates: selectedDates
+            }, false);
+            setBtnLoad('btnCalcPayroll', false);
+
+            const r = res;
+            const html = `
+                <div class="bg-white p-4 rounded-xl shadow-lg border border-teal-100">
+                    <div class="flex justify-between mb-2"><span>วันทำงาน:</span> <strong>${r.days} วัน</strong></div>
+                    <div class="flex justify-between mb-2"><span>ค่าแรง (${r.rate}/วัน):</span> <strong>${Number(r.baseSalary).toLocaleString()}</strong></div>
+                    <div class="flex justify-between mb-2 text-red-500"><span>หักสาย (${r.lateMin} น.):</span> <strong>-${Number(r.lateDeduct).toLocaleString()}</strong></div>
+                    <div class="flex justify-between mb-2 text-red-500"><span>หักเงินขาดเฉลี่ย:</span> <strong>-${Number(r.shortageDeduct).toLocaleString()}</strong></div>
+                    <hr class="my-2">
+                    <div class="flex justify-between text-lg font-bold text-teal-700"><span>สุทธิ:</span> <span>${Number(r.netTotal).toLocaleString()}</span></div>
+                    
+                    <button id="btnConfirmPay" onclick="confirmPay(${r.netTotal}, ${r.lateDeduct}, ${r.shortageDeduct})" class="w-full mt-4 bg-green-500 text-white py-2 rounded shadow hover:bg-green-600">ยืนยันการจ่ายเงิน</button>
+                </div>
+            `;
+            const resDiv = document.getElementById('payrollResult');
+            resDiv.innerHTML = html;
+            resDiv.classList.remove('hidden');
+        };
+
+        const confirmPay = async (amt, late, short) => {
+            const { isConfirmed } = await Swal.fire({ title:'ยืนยันจ่ายเงิน?', text: `ยอดสุทธิ ${amt.toLocaleString()} บาท`, icon:'question', showCancelButton:true });
+            if(isConfirmed) {
+                setBtnLoad('btnConfirmPay', true);
+                await callAPI('confirmSalaryPayment', {
+                    employee: val('pEmp'),
+                    amount: amt,
+                    start: val('pStart'),
+                    end: val('pEnd'),
+                    lateDed: late,
+                    shortDed: short,
+                    payer: user.username
+                }, false);
+                setBtnLoad('btnConfirmPay', false);
+
+                Swal.fire('สำเร็จ', 'บันทึกการจ่ายเงินเรียบร้อย', 'success');
+                pagePaySalary(); // Reset
+            }
+        };
+
+        // *** SUB-PAGE: SET WAGE ***
+        const pageSetWage = async () => {
+            render(`
+                <h2 class="text-xl font-bold text-blue-600 mb-4">ตั้งค่าค่าแรงพนักงาน</h2>
+                <div id="wageList" class="space-y-2">Loading...</div>
+            `);
+            
+            const rRes = await callAPI('getSalaryRates');
+            const uRes2 = await callAPI('getUsers');
+            
+            const rates = {};
+            if(rRes.data) rRes.data.forEach(r => rates[r[0]] = r[1]);
+
+            const list = uRes2.data.filter(u=>u[2]!='เจ้าของร้าน').map(u => {
+                const currentRate = rates[u[0]] || 0;
+                return `
+                <div class="bg-white p-3 rounded-lg shadow flex justify-between items-center">
+                    <div>
+                        <div class="font-bold">${u[3]}</div>
+                        <div class="text-xs text-gray-500">${u[0]}</div>
+                    </div>
+                    <button onclick="editWage('${u[0]}', '${u[3]}', ${currentRate})" class="text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded">
+                        ${currentRate} บ./วัน <i class="fa-solid fa-pen ml-1 text-xs"></i>
+                    </button>
+                </div>`;
+            }).join('');
+            
+            document.getElementById('wageList').innerHTML = list;
+        };
+
+        const editWage = async (user, name, oldRate) => {
+            const { value: rate } = await Swal.fire({
+                title: `ตั้งค่าแรง: ${name}`,
+                input: 'number',
+                inputValue: oldRate,
+                inputLabel: 'บาทต่อวัน',
+                showCancelButton: true
+            });
+            if (rate) {
+                await callAPI('saveSalaryRate', { employee: user, rate: rate });
+                Swal.fire('Saved', '', 'success');
+                pageSetWage();
+            }
+        };
+
+        // *** SUB-PAGE: SET LATE RULE ***
+        const pageSetLate = async () => {
+            const res = await callAPI('getLateRules');
+            const rule = (res.data && res.data[0]) ? res.data[0] : ['08:00', '08:15', 5];
+            
+            render(`
+                <h2 class="text-xl font-bold text-red-500 mb-4">ตั้งค่าการมาสาย</h2>
+                <div class="glass p-5 rounded-xl space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700">เวลาเข้างานปกติ</label>
+                        <input type="time" id="lStart" value="${rule[0]}" class="w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700">นับว่าสายเมื่อหลังเวลา</label>
+                        <input type="time" id="lLate" value="${rule[1]}" class="w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700">หักเงินนาทีละ (บาท)</label>
+                        <input type="number" id="lDed" value="${rule[2]}" class="w-full border p-2 rounded">
+                    </div>
+                    <button id="btnSaveLateRule" onclick="saveLateRule()" class="w-full btn-primary py-3 rounded shadow">บันทึกตั้งค่า</button>
+                </div>
+            `);
+        };
+
+        const saveLateRule = async () => {
+            setBtnLoad('btnSaveLateRule', true);
+            await callAPI('saveLateRule', {
+                startTime: val('lStart'),
+                lateTime: val('lLate'),
+                deduction: val('lDed')
+            }, false);
+            setBtnLoad('btnSaveLateRule', false);
+            Swal.fire('Saved', 'บันทึกเรียบร้อย', 'success');
+        };
+
+        // --- NEW OWNER SALES VIEW WITH DASHBOARD & COMPARISON ---
+        const pageOwnSalesView = async () => {
+            render(`
+                <h2 class="text-xl font-bold text-indigo-600 mb-4">ประวัติยอดขายประจำวัน</h2>
+                
+                <div class="bg-white p-4 rounded-xl shadow-sm mb-4">
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <button onclick="filterSales('today')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs">วันนี้</button>
+                        <button onclick="filterSales('yesterday')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs">เมื่อวาน</button>
+                        <button onclick="filterSales('all')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs">ทั้งหมด</button>
+                        <button onclick="document.getElementById('customFilter').classList.toggle('hidden')" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs">กำหนดเอง</button>
+                    </div>
+                    <div id="customFilter" class="hidden flex gap-2 items-end bg-gray-50 p-3 rounded-lg animate-fade-in">
+                        <div class="w-full"><label class="text-xs">เริ่ม</label><input type="date" id="fStart" class="w-full border p-1 rounded text-sm"></div>
+                        <div class="w-full"><label class="text-xs">ถึง</label><input type="date" id="fEnd" class="w-full border p-1 rounded text-sm"></div>
+                        <button onclick="filterSales('custom')" class="bg-indigo-600 text-white px-3 py-1.5 rounded h-fit mb-0.5 text-sm">ค้นหา</button>
+                    </div>
+                </div>
+
+                <!-- Dashboard -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-green-50 p-4 rounded-xl border border-green-100 shadow-sm text-center">
+                        <div class="text-xs text-green-600 mb-1">ยอดขายเงินสดรวม</div>
+                        <div class="text-xl font-bold text-green-700 flex flex-col items-center">
+                            <span id="dashCash">0</span>
+                            <span id="diffCash" class="text-xs font-normal text-gray-400 mt-1"></span>
+                        </div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm text-center">
+                        <div class="text-xs text-blue-600 mb-1">ยอดขายเงินโอนรวม</div>
+                        <div class="text-xl font-bold text-blue-700 flex flex-col items-center">
+                            <span id="dashTrans">0</span>
+                            <span id="diffTrans" class="text-xs font-normal text-gray-400 mt-1"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="salesTable" class="space-y-3 pb-8">
+                    <div class="text-center text-gray-500 mt-10"><span class="loader border-t-indigo-500"></span> กำลังโหลดข้อมูล...</div>
+                </div>
+            `);
+            const res = await callAPI('getDailySales');
+            allSalesData = res.data || [];
+            filterSales('today'); 
+        };
+
+        const filterSales = (mode) => {
+            const div = document.getElementById('salesTable');
+            if(!allSalesData.length) { div.innerHTML = '<p class="text-center text-gray-400">ไม่มีข้อมูลในระบบ</p>'; updateDash(0,0,0,0,false); return; }
+
+            let start, end;
+            const now = new Date();
+            
+            if (mode === 'all') {
+                start = new Date(0); 
+                end = new Date(8640000000000000); 
+            } else if (mode === 'today') {
+                start = new Date(now.setHours(0,0,0,0));
+                end = new Date(now.setHours(23,59,59,999));
+            } else if (mode === 'yesterday') {
+                const y = new Date(now); y.setDate(y.getDate() - 1);
+                start = new Date(y.setHours(0,0,0,0));
+                end = new Date(y.setHours(23,59,59,999));
+            } else {
+                const s = document.getElementById('fStart').value;
+                const e = document.getElementById('fEnd').value;
+                if(!s || !e) return Swal.fire('แจ้งเตือน','กรุณาระบุวันที่เริ่มต้นและสิ้นสุด','warning');
+                start = new Date(s); start.setHours(0,0,0,0);
+                end = new Date(e); end.setHours(23,59,59,999);
+            }
+
+            const filtered = allSalesData.filter(row => {
+                const d = new Date(row[0]);
+                return d >= start && d <= end;
+            });
+
+            // Compare with previous period
+            const prevEnd = new Date(start.getTime() - 1);
+            const prevStart = new Date(prevEnd.getTime() - (end.getTime() - start.getTime()));
+            
+            const prevFiltered = mode === 'all' ? [] : allSalesData.filter(row => {
+                const d = new Date(row[0]);
+                return d >= prevStart && d <= prevEnd;
+            });
+
+            let totalCash = 0, totalTrans = 0;
+            filtered.forEach(r => { totalCash += Number(r[1] || 0); totalTrans += Number(r[2] || 0); });
+
+            let prevCash = 0, prevTrans = 0;
+            prevFiltered.forEach(r => { prevCash += Number(r[1] || 0); prevTrans += Number(r[2] || 0); });
+
+            updateDash(totalCash, totalTrans, prevCash, prevTrans, mode !== 'all');
+
+            if (filtered.length === 0) {
+                div.innerHTML = '<div class="text-center text-gray-400 py-8">ไม่พบข้อมูลในช่วงเวลาที่เลือก</div>';
+                return;
+            }
+
+            div.innerHTML = filtered.reverse().map(r => `
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 ${r[5]>0?'border-red-500':r[6]>0?'border-green-500':'border-gray-300'} text-sm relative">
+                    <div class="flex justify-between items-start mb-2 border-b pb-2">
+                        <div>
+                            <div class="font-bold text-base text-gray-800">${fmtDate(r[0])}</div>
+                            <div class="text-xs text-gray-500">ผู้บันทึก: ${r[7]}</div>
+                        </div>
+                         <div class="text-right">
+                            ${r[5]>0 ? `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-xs font-bold block mb-1">ขาด ${Number(r[5]).toLocaleString()}</span>` : ''}
+                            ${r[6]>0 ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-xs font-bold block">เกิน ${Number(r[6]).toLocaleString()}</span>` : ''}
+                            ${r[5]==0 && r[6]==0 ? `<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">ครบถ้วน</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-gray-600">
+                        <div class="flex justify-between"><span><i class="fa-solid fa-server text-indigo-400"></i> สด(ระบบ):</span> <span class="font-medium">${Number(r[1]).toLocaleString()}</span></div>
+                        <div class="flex justify-between"><span><i class="fa-solid fa-hand-holding-dollar text-orange-400"></i> สด(นับ):</span> <span class="font-bold text-gray-800">${Number(r[3]).toLocaleString()}</span></div>
+                        <div class="flex justify-between"><span><i class="fa-solid fa-server text-indigo-400"></i> โอน(ระบบ):</span> <span class="font-medium">${Number(r[2]).toLocaleString()}</span></div>
+                        <div class="flex justify-between"><span><i class="fa-solid fa-mobile-screen text-blue-400"></i> โอน(นับ):</span> <span class="font-bold text-gray-800">${Number(r[4]).toLocaleString()}</span></div>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        const updateDash = (c, t, pc, pt, showDiff) => {
+            const dc = document.getElementById('dashCash');
+            const dt = document.getElementById('dashTrans');
+            const difC = document.getElementById('diffCash');
+            const difT = document.getElementById('diffTrans');
+
+            if(dc) dc.innerText = c.toLocaleString();
+            if(dt) dt.innerText = t.toLocaleString();
+
+            if(showDiff) {
+                const diffValC = c - pc;
+                const diffValT = t - pt;
+                const formatDiff = (val) => {
+                    if (val > 0) return `<span class="text-green-600"><i class="fa-solid fa-caret-up"></i> +${val.toLocaleString()}</span> (จากก่อนหน้า)`;
+                    if (val < 0) return `<span class="text-red-500"><i class="fa-solid fa-caret-down"></i> ${val.toLocaleString()}</span> (จากก่อนหน้า)`;
+                    return `<span class="text-gray-400">- ไม่เปลี่ยนแปลง</span>`;
+                };
+                if(difC) difC.innerHTML = formatDiff(diffValC);
+                if(difT) difT.innerHTML = formatDiff(diffValT);
+            } else {
+                if(difC) difC.innerHTML = '';
+                if(difT) difT.innerHTML = '';
+            }
+        };
+
+        // *** NEW: OWNER MANAGE PETTY CASH ***
+        const pageOwnPettyCash = async () => {
+            render(`
+                <h2 class="text-xl font-bold text-indigo-600 mb-4"><i class="fa-solid fa-coins"></i> จัดการเงินสำรองจ่าย</h2>
+                <div class="glass p-4 rounded-xl space-y-4 mb-4">
+                    <div><label class="text-xs text-gray-500">วันที่</label><input type="date" id="pcDate" class="w-full border p-2 rounded-lg bg-white"></div>
+                    <div><label class="text-xs text-gray-500">จ่ายให้พนักงาน</label><select id="pcEmp" class="w-full border p-2 rounded-lg bg-white"><option>กำลังโหลด...</option></select></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-xs text-gray-500">จำนวนเงิน</label><input type="text" id="pcAmt" class="w-full border p-2 rounded-lg" oninput="fmtMoney(this)"></div>
+                        <div><label class="text-xs text-gray-500">ประเภทเงิน</label><select id="pcType" class="w-full border p-2 rounded-lg bg-white" onchange="document.getElementById('divPcSlip').classList.toggle('hidden', this.value!=='เงินโอน')"><option value="เงินสด">เงินสด</option><option value="เงินโอน">เงินโอน</option></select></div>
+                    </div>
+                    <div id="divPcSlip" class="hidden"><label class="block text-xs text-gray-500 mb-1">รูปสลิปการโอน</label><input type="file" id="pcSlip" accept="image/*" class="w-full text-sm"></div>
+                    <button id="btnSavePettyCash" onclick="savePettyCash()" class="w-full btn-primary py-3 rounded-xl font-bold shadow-md">บันทึกรายการ</button>
+                </div>
+                <h3 class="font-bold text-gray-700 mb-2">ประวัติการทำรายการ</h3>
+                <div class="overflow-x-auto rounded-lg border">
+                    <table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-100"><tr><th class="px-3 py-2">วันที่</th><th class="px-3 py-2">ให้</th><th class="px-3 py-2">จำนวน</th><th class="px-3 py-2">คงเหลือ</th><th class="px-3 py-2"></th></tr></thead><tbody id="pcHistoryBody"><tr><td colspan="5" class="text-center py-4">กำลังโหลด...</td></tr></tbody></table>
+                </div>
+            `);
+            document.getElementById('pcDate').valueAsDate = new Date();
+            
+            const uRes = await callAPI('getUsers');
+            const empSel = document.getElementById('pcEmp');
+            empSel.innerHTML = uRes.data.filter(u=>u[2]!='เจ้าของร้าน').map(u=>`<option value="${u[0]}">${u[3]}</option>`).join('');
+
+            const histRes = await callAPI('getPettyCashConfig'); 
+            const tbody = document.getElementById('pcHistoryBody');
+            if(!histRes.data || histRes.data.length===0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4">ไม่มีข้อมูล</td></tr>'; return; }
+            
+            tbody.innerHTML = histRes.data.slice().reverse().map(r => `
+                <tr class="bg-white border-b hover:bg-gray-50">
+                    <td class="px-3 py-3">${fmtDate(r[0])}</td>
+                    <td class="px-3 py-3">${r[3]}</td>
+                    <td class="px-3 py-3 font-bold text-green-600">${Number(r[2]).toLocaleString()}</td>
+                    <td class="px-3 py-3">${Number(r[7]||0).toLocaleString()}</td>
+                    <td class="px-3 py-3 text-center"><button onclick="showPcDetail('${encodeURIComponent(JSON.stringify(r))}')" class="text-gray-500 hover:text-orange-500"><i class="fa-solid fa-eye"></i></button></td>
+                </tr>
+            `).join('');
+        };
+
+        const savePettyCash = async () => {
+            const date = val('pcDate'), emp = val('pcEmp'), amt = val('pcAmt').replace(/,/g,''), type = val('pcType');
+            const fSlip = document.getElementById('pcSlip').files[0];
+            if(!date || !emp || !amt) return Swal.fire('Error', 'กรอกข้อมูลไม่ครบ', 'error');
+            if(type=='เงินโอน' && !fSlip) return Swal.fire('Error', 'แนบสลิปด้วย', 'error');
+            
+            setBtnLoad('btnSavePettyCash', true);
+            const b64 = fSlip ? await toBase64(fSlip) : null;
+            await callAPI('savePettyCashAllocation', { date, payTo: emp, amount: amt, type, slipBase64: b64, user: user.username }, false);
+            setBtnLoad('btnSavePettyCash', false);
+            
+            Swal.fire('Success', 'บันทึกเรียบร้อย', 'success'); pageOwnPettyCash();
+        };
+
+        const showPcDetail = (enc) => {
+            const r = JSON.parse(decodeURIComponent(enc));
+            Swal.fire({
+                title: 'รายละเอียดเงินสำรองจ่าย',
+                html: `<div class="text-left space-y-2 text-sm"><p><strong>วันที่:</strong> ${fmtDate(r[0])}</p><p><strong>จำนวนเงิน:</strong> ${Number(r[2]).toLocaleString()} บาท</p><p><strong>ประเภท:</strong> ${r[4]||'-'}</p><p><strong>จ่ายให้:</strong> ${r[3]}</p><p><strong>ผู้ทำรายการ:</strong> ${r[6]||'-'}</p><p><strong>เงินคงเหลือ(ขณะนั้น):</strong> ${Number(r[7]||0).toLocaleString()}</p>${r[5] ? `<div class="mt-2 text-center"><img src="${r[5]}" class="max-h-64 mx-auto border rounded"></div>` : ''}</div>`,
+                confirmButtonText: 'ปิด'
+            });
+        };
+
+        // --- OTHER PAGES (Re-adding missing ones from context to keep file complete) ---
+        const pageCredit = async () => { render('<h3>จัดการเงินเชื่อ</h3><div id="cl">Loading...</div>'); const r=await callAPI('getCreditList'); document.getElementById('cl').innerHTML=r.data.map(i=>`<div>${i[1]} - ${i[2]}</div>`).join(''); };
+        const pageSummary = async () => { const r=await callAPI('getAccountSummary'); render(`<h3>สรุป</h3><div>รับ: ${r.sCash+r.sTrans} | จ่าย: ${r.eCash+r.eTrans}</div>`); };
+        const pageOwnTime = () => Swal.fire('Info','Coming Soon');
+        const pageOwnLoc = async () => {
+             render(`
+                <div class="text-center mb-6">
+                    <i class="fa-solid fa-map-location-dot text-6xl text-red-500 drop-shadow-md"></i>
+                    <h2 class="text-xl font-bold text-red-600 mt-2">ตั้งค่าพิกัดร้าน</h2>
+                </div>
+
+                <div class="glass p-5 rounded-xl space-y-4 border border-red-100">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold">Latitude (ละติจูด)</label>
+                            <input type="text" id="locLat" class="w-full border p-2 rounded-lg bg-gray-50" placeholder="0.000000">
+                        </div>
+                        <div>
+                             <label class="text-xs text-gray-500 font-bold">Longitude (ลองจิจูด)</label>
+                             <input type="text" id="locLng" class="w-full border p-2 rounded-lg bg-gray-50" placeholder="0.000000">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs text-gray-500 font-bold">ระยะที่ยอมรับ (เมตร)</label>
+                        <input type="number" id="locRad" class="w-full border p-2 rounded-lg bg-white" placeholder="100" value="100">
+                        <p class="text-xs text-gray-400 mt-1">* ระยะห่างจากจุดพิกัดที่อนุญาตให้ลงเวลาได้</p>
+                    </div>
+
+                    <button id="btnGetLoc" onclick="getCurrentLoc()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl shadow flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-location-crosshairs"></i> ดึงพิกัดปัจจุบัน
+                    </button>
+
+                    <button id="btnSaveLoc" onclick="submitLoc()" class="w-full btn-primary py-3 rounded-xl shadow-lg font-bold">
+                        บันทึกพิกัด
+                    </button>
+                </div>
+            `);
+             const res = await callAPI('getLocation');
+             if(res.data && res.data[0]) {
+                 document.getElementById('locLat').value = res.data[0][0];
+                 document.getElementById('locLng').value = res.data[0][1];
+                 document.getElementById('locRad').value = res.data[0][2];
+             }
+        };
+
+        const getCurrentLoc = () => {
+            if(!navigator.geolocation) return Swal.fire('Error','GPS not supported','error');
+            setBtnLoad('btnGetLoc', true);
+            navigator.geolocation.getCurrentPosition(pos => {
+                document.getElementById('locLat').value = pos.coords.latitude;
+                document.getElementById('locLng').value = pos.coords.longitude;
+                setBtnLoad('btnGetLoc', false);
+                Swal.fire('สำเร็จ', 'ดึงพิกัดเรียบร้อย', 'success');
+            }, err => {
+                setBtnLoad('btnGetLoc', false);
+                Swal.fire('Error', err.message, 'error');
+            });
+        };
+
+        const submitLoc = async () => {
+            const lat = val('locLat');
+            const lng = val('locLng');
+            const rad = val('locRad');
+            if(!lat || !lng || !rad) return Swal.fire('Error', 'กรุณากรอกข้อมูลให้ครบ', 'warning');
+            
+            setBtnLoad('btnSaveLoc', true);
+            const res = await callAPI('saveLocation', {lat, lng, radius: rad});
+            setBtnLoad('btnSaveLoc', false);
+            
+            if(res.success) Swal.fire('สำเร็จ', 'บันทึกพิกัดร้านเรียบร้อย', 'success');
+        };
+
+        // --- HELPERS ---
+        const render = (h) => {
+            if(clockInterval) { clearInterval(clockInterval); clockInterval = null; }
+            document.getElementById('menu-grid').classList.add('hidden');
+            document.getElementById('content-area').classList.remove('hidden');
+            document.getElementById('content-area').innerHTML = `<button onclick="renderMenu()" class="mb-2 text-xs text-gray-400 hover:text-orange-500 flex items-center gap-1"><i class="fa-solid fa-arrow-left"></i> กลับเมนูหลัก</button><div class="animate-fade-in">${h}</div>`;
+        };
+        const val = id => document.getElementById(id).value;
+        const txt = id => document.getElementById(id).innerText;
+        
+        // --- UPDATED DATE/TIME FORMATTERS ---
+        // Enhanced to handle dd/mm/yyyy strings
+        const fmtDMY = (d) => {
+            if (!d) return '-';
+            if (typeof d === 'string' && d.match(/^\d{2}\/\d{2}\/\d{4}$/)) return d; // Return as is if already formatted
+            const date = new Date(d);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        };
+        const fmtDate = (d) => fmtDMY(d);
+
+        const callAPI = async (act, data={}, showGlobalLoader=true) => {
+            if(showGlobalLoader) document.getElementById('loading').classList.remove('hidden');
+            try {
+                const req = await fetch(WEB_APP_URL, { method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({...data, action:act}) });
+                const res = await req.json();
+                if(showGlobalLoader) document.getElementById('loading').classList.add('hidden');
+                return res;
+            } catch(e) { 
+                if(showGlobalLoader) document.getElementById('loading').classList.add('hidden');
+                console.error(e); Swal.fire('Error', 'Connection Failed', 'error'); return {success:false}; 
+            }
+        };
+
+        const triggerSetup = async () => { 
+            setBtnLoad('btnSetup', true);
+            const res = await callAPI('setup', {}, false); 
+            setBtnLoad('btnSetup', false);
+            if(res.success) Swal.fire('Setup', res.message, 'info'); 
+        };
+        const toBase64 = f => new Promise((r,j)=>{const d=new FileReader();d.readAsDataURL(f);d.onload=()=>r(d.result);d.onerror=e=>j(e);});
+        const getDist = (lat1,lon1,lat2,lon2) => { const R=6371e3; const φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180, Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lon2-lon1)*Math.PI/180; const a=Math.sin(Δφ/2)*Math.sin(Δφ/2)+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)*Math.sin(Δλ/2); return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); };
+
+        init();
+    </script>
+    <script>const togglePass = (id) => { const x=document.getElementById(id); x.type=x.type==='password'?'text':'password'; };</script>
+</body>
+</html>
